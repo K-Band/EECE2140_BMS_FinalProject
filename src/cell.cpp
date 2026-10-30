@@ -4,22 +4,32 @@ Cell::Cell(double capacityAh, double baseResistance, double startSOC)
     : capacityAh(capacityAh), soc(startSOC), baseResistance(baseResistance),
       temperature(25.0), presentCurrent(0.0) {}
 
-void Cell::update(double current, double /*dt*/) {
+// advances SOC and temperature
+void Cell::update(double current, double dt) {
     presentCurrent = current;
-    // TODO: soc -= current * dt / (3600 * capacityAh), clamp to [0, 1],
-    //       then temperature = thermal.step(temperature, current, getResistance(), dt)
+    
+    soc -= current * dt / (3600 * capacityAh);
+    if(soc < 0) soc = 0;
+    if(soc > 1.0) soc = 1.0;
+
+    temperature = thermal.step(temperature, current, getResistance(), dt);
 }
 
+// returns the actual voltage of the battery the OCV - resistance losses
 double Cell::getTerminalVoltage() const {
-    // TODO: return getOCV() - presentCurrent * getResistance()
-    return getOCV();
+    return getOCV() - presentCurrent * getResistance();
 }
 
 double Cell::getOCV() const { return ocvTable.lookup(soc); }
 
+// simple approximation for cell resistance changing with temperature
 double Cell::getResistance() const {
-    // TODO: make resistance depend on temperature
-    return baseResistance;
+    const double alpha = 0.01; // change in resistance per deg C
+    
+    double r = baseResistance * (1.0 + alpha * (25.0 - temperature));
+    if(r < 0.5 * baseResistance) r = 0.5 * baseResistance; // floor for change in resistance
+    
+    return r;
 }
 
 double Cell::getSOC() const { return soc; }
