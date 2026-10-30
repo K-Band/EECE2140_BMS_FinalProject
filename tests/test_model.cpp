@@ -28,10 +28,6 @@ int main() {
     for (double s = 0.0; s < 1.0; s += 0.01)
         assert(table.lookup(s + 0.01) > table.lookup(s));
 
-    // TODO: OCV interpolation between table points
-    // TODO: steady-state temperature settles at T_amb + I^2 R / k
-    // TODO: SOC drops by I * dt / (3600 * capacity) after one step
-
     //Cell tests
 
     // SOC: 3 A for 360 s on a 3 Ah cell removes 0.1 (10%)
@@ -62,6 +58,41 @@ int main() {
     Cell hot(3.0, 0.02, 1.0);
     for (int i = 0; i < 600; i++) hot.update(10.0, 1.0);
     assert(hot.getTemperature() > 25.0);
+
+    //ThermalModel steady-state test
+    
+    // At steady state heating = cooling: I^2 R = k (T - T_amb)
+    // T = 25 + (3^2 * 0.02) / 0.03 = 31 deg C
+    ThermalModel thermalModel(0.03, 46.0, 25.0);
+    double temp = 25.0;
+    for (int i = 0; i < 20000; i++) temp = thermalModel.step(temp, 3.0, 0.02, 1.0);
+    assert(std::fabs(temp - 31.0) < 0.01);
+
+    //Pack tests
+    Pack p;
+    p.configure(4, 3.0, 0.02, 0.5);
+    assert(p.getNumCells() == 4);
+
+    // At rest, pack voltage = 4 x OCV at 50% = 4 x 3.72 = 14.88 V
+    assert(std::fabs(p.getVoltage() - 14.88) < 1e-6);
+
+    // Average SOC starts at 50%
+    assert(std::fabs(p.getSOC() - 0.5) < 1e-9);
+
+    // 3 A for 360 s removes 10% from every cell
+    for (int i = 0; i < 360; i++) p.applyCurrent(3.0, 1.0);
+    assert(std::fabs(p.getSOC() - 0.4) < 1e-6);
+
+    // Identical cells: max = min, and pack voltage = 4 x one cell
+    assert(std::fabs(p.getMaxCellVoltage() - p.getMinCellVoltage()) < 1e-9);
+    assert(std::fabs(p.getVoltage() - 4.0 * p.getMaxCellVoltage()) < 1e-9);
+
+    // Pack heats up under load
+    assert(p.getMaxTemperature() > 25.0);
+
+    // configure() rejects a 0-cell pack
+    p.configure(0, 3.0, 0.02, 1.0);
+    assert(p.getNumCells() == 1);
 
     std::cout << "test_model: all tests passed\n";
     return 0;

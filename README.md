@@ -1,7 +1,10 @@
 BMS Simulator
-A text-based C++ simulation of a lithium-ion battery management system (BMS). The program models a series battery pack and tracks charging, energy use, state of charge (SOC), temperature, and warning/fault conditions through a menu-driven console interface.
+A text-based C++ simulation of a lithium-ion battery management system (BMS). The reference cell is a LG 18650HG2. The program models a series battery pack and tracks charging, energy use, state of charge (SOC), temperature, and warning/fault conditions through a menu-driven console interface.
+
 EECE 2140 Final Project, Group 07: Drew Bancroft, Kavi Bandara, Anthony Wang
+
 Building and Running
+
 Requirements: `g++` with C++17 support and `make`.
 ```bash
 make          # builds the ./bms executable
@@ -9,10 +12,7 @@ make          # builds the ./bms executable
 make test     # builds and runs all tests in tests/
 make clean    # removes build files
 ```
-On Windows without `make`, build directly:
-```bash
-g++ -std=c++17 -Wall -Wextra -Iinclude src/*.cpp -o bms
-```
+
 Menu
 Option	Task	Description	Owner
 1	T1	Configure pack (cell count, capacity, resistance, starting SOC)	Kavi
