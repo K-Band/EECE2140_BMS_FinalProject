@@ -5,13 +5,13 @@
 #include "thermal_model.h"
 
 // Owner: Kavi
-// One lithium-ion cell.
+// One LG 18650HG2 cell
 // Current sign convention (used everywhere in the project):
 //   current > 0  -> discharging (current leaves the cell)
 //   current < 0  -> charging    (current enters the cell)
 class Cell {
 public:
-    Cell(double capacityAh = 3.0, double baseResistance = 0.02, double startSOC = 1.0);
+    Cell(double capacityAh = 3.0, double baseResistance = 0.021, double startSOC = 1.0);
 
     void update(double current, double dt);   // advance SOC and temperature by dt seconds
     double getTerminalVoltage() const;        // OCV - I * R
