@@ -1,0 +1,14 @@
+# Build output
+build/
+bms
+bms.exe
+*.o
+*.d
+
+# Simulation logs (keep input data in data/)
+*.csv
+!data/*.csv
+
+# Editor / OS files
+.vscode/
+.DS_Store
