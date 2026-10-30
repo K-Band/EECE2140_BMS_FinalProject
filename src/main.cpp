@@ -1,4 +1,3 @@
-/*
 #include <iostream>
 #include <limits>
 #include "simulator.h"
@@ -52,4 +51,3 @@ int main() {
     }
     return 0;
 }
-*/
