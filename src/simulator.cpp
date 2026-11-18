@@ -12,11 +12,97 @@ Simulator::Simulator(double timestep)
 }
 
 
-// Run charge cycle - shared with Drew
+
 void Simulator::runCharge()
 {
-    cout << "Charge cycle not implemented yet." << endl;
+    cout << "\n===== Running Charge Cycle =====" << endl;
+
+    if (protection.isFaulted())
+    {
+        cout << "Cannot charge. A fault is active." << endl;
+        return;
+    }
+
+    if (!contactor.isClosed())
+    {
+        cout << "Cannot charge. Contactor is open." << endl;
+        return;
+    }
+
+    if (timestep <= 0)
+    {
+        cout << "Invalid simulation timestep." << endl;
+        return;
+    }
+
+    double startTime = time;
+    double maxTime = 14400.0;
+    double nextPrint = time + 60.0;
+
+    eventLog.add(time, "Charge cycle started");
+
+    cout << "\nInitial battery status:" << endl;
+    printStatusLine();
+
+    while (time - startTime < maxTime)
+    {
+        if (protection.isFaulted() || !contactor.isClosed())
+        {
+            break;
+        }
+
+        // Get charging current from CC-CV charger
+        double current = charger.getChargeCurrent(pack);
+
+        if (charger.isDone())
+        {
+            cout << "\nCharging completed." << endl;
+            break;
+        }
+
+        if (!isfinite(current) || current >= 0)
+        {
+            cout << "Invalid charging current." << endl;
+            break;
+        }
+
+        // Update battery and other systems
+        step(current);
+
+        // Print status every 60 seconds
+        if (time >= nextPrint)
+        {
+            cout << "\nCharger Mode: "
+                 << charger.getModeName() << endl;
+
+            printStatusLine();
+
+            nextPrint = time + 60.0;
+        }
+
+        if (protection.isFaulted())
+        {
+            cout << "\nCharging stopped due to a fault." << endl;
+            cout << protection.getFaultReason() << endl;
+            break;
+        }
+    }
+
+    if (time - startTime >= maxTime)
+    {
+        cout << "Maximum charging time reached." << endl;
+    }
+
+    eventLog.add(time, "Charge cycle ended");
+
+    cout << "\n===== Charge Finished =====" << endl;
+
+    cout << "Final charger mode: "
+         << charger.getModeName() << endl;
+
+    printStatusLine();
 }
+
 
 
 // Run discharge cycle
@@ -58,9 +144,10 @@ void Simulator::runDischarge()
             break;
         }
 
-        if (pack.getSOC() <= 0.05)
+        if (pack.getSOC() <= 0.10)
         {
-            cout << "Battery SOC is too low." << endl;
+            cout << "\nDischarge completed." << endl;
+            cout << "Battery reached 10% SOC." << endl;
             break;
         }
 
