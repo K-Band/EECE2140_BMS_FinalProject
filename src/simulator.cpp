@@ -141,10 +141,11 @@ void Simulator::runDischarge()
             break;
         }
 
-        if (pack.getSOC() <= 0.10)
+        double socLimit = protection.getLimit(Protection::LOW_SOC, Protection::WARNING);
+        if (pack.getSOC() <= socLimit)
         {
             cout << "\nDischarge completed." << endl;
-            cout << "Battery reached 10% SOC." << endl;
+            cout << "Battery reached the low-SOC limit (" << socLimit * 100.0 << "%)." << endl;
             break;
         }
 
