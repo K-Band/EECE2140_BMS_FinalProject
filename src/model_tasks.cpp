@@ -31,6 +31,7 @@ void configurePack(Simulator& sim)
     double startSOC   = readNumber("Starting SOC in % (0-100): ", 0, 100) / 100.0;
 
     sim.getPack().configure(numCells, capacityAh, resistance, startSOC);
+    sim.getSocEstimator().reset(startSOC);
 
     cout << "\nPack configured:\n";
     sim.getPack().printCellStatus();
