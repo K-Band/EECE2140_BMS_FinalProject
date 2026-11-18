@@ -1,3 +1,4 @@
+// control_tasks.cpp - T3, T5, T6, T7 (Drew)
 #include <iostream>
 #include <iomanip>
 #include <limits>
@@ -13,9 +14,10 @@
 
 using namespace std;
 
+// Reads a number from the user. On bad input, clears it and returns false.
 template <typename T>
 static bool readNumber(T& value)
-{ 
+{
     if (cin >> value) return true;
     if (cin.eof()) return false;
     cin.clear();
@@ -24,47 +26,69 @@ static bool readNumber(T& value)
     return false;
 }
 
-// T3: run a CC-CV charge and summarize the result
+// T3: run a CC-CV charge quietly, then print one summary
+// Uses its own loop with sim.step() instead of sim.runCharge(), so there is
+// no per-step output, and it always stops on a fault or a time limit.
 void chargeCycle(Simulator& sim)
 {
     Pack& pack = sim.getPack();
     Charger& charger = sim.getCharger();
     EnergyTracker& energy = sim.getEnergyTracker();
     Protection& prot = sim.getProtection();
- 
+
     if (prot.isFaulted()) {
         cout << "Cannot charge: " << prot.getFaultReason() << endl;
         cout << "Use option 7 to reset the fault first." << endl;
         return;
     }
- 
+
     double startSOC = pack.getSOC();
     double startWhIn = energy.getWhIn();
- 
-    cout << fixed << setprecision(1);
-    cout << "Starting CC-CV charge at " << startSOC * 100.0 << "% SOC..." << endl;
+    double startTime = sim.getTime();
+    double cvStartTime = -1.0;  // stays negative if CV never starts
+
+    // Safety limit: 48 hours of simulated time
+    const long maxSteps = static_cast<long>(48.0 * 3600.0 / sim.getTimestep());
+    long steps = 0;
+
+    cout << "Charging..." << endl;
     charger.reset();
-    sim.runCharge();
- 
+    while (!charger.isDone() && !prot.isFaulted() && steps < maxSteps) {
+        double current = charger.getChargeCurrent(pack);
+        if (charger.getMode() == Charger::CV && cvStartTime < 0.0) {
+            cvStartTime = sim.getTime();
+        }
+        sim.step(current);
+        steps++;
+    }
+
+    double minutes = (sim.getTime() - startTime) / 60.0;
+
+    cout << fixed << setprecision(1);
     cout << "\n--- Charge summary ---" << endl;
     if (prot.isFaulted()) {
-        cout << "Stopped by fault: " << prot.getFaultReason() << endl;
+        cout << "Result: stopped by fault - " << prot.getFaultReason() << endl;
     } else if (charger.isDone()) {
-        cout << "Charge complete: current tapered below the cutoff." << endl;
+        cout << "Result: charge complete (current tapered below the cutoff)" << endl;
     } else {
-        cout << "Charge stopped in " << charger.getModeName() << " mode." << endl;
+        cout << "Result: stopped at the 48-hour time limit" << endl;
     }
+    cout << "Time: " << minutes << " min";
+    if (cvStartTime >= 0.0) {
+        cout << " (CV started at " << (cvStartTime - startTime) / 60.0 << " min)";
+    }
+    cout << endl;
     cout << "SOC: " << startSOC * 100.0 << "% -> " << pack.getSOC() * 100.0 << "%" << endl;
     cout << setprecision(3);
     cout << "Energy added: " << energy.getWhIn() - startWhIn << " Wh" << endl;
 }
- 
+
 // T5: compare the coulomb-counted estimate with the true SOC
 void showSOC(Simulator& sim)
 {
     double trueSOC = sim.getPack().getSOC();
     SocEstimator& estimator = sim.getSocEstimator();
- 
+
     cout << fixed << setprecision(2);
     cout << "\n--- SOC estimate vs. true SOC ---" << endl;
     cout << "True SOC:      " << setw(7) << trueSOC * 100.0 << " %" << endl;
@@ -72,17 +96,17 @@ void showSOC(Simulator& sim)
     cout << "Error:         " << setw(7) << estimator.getError(trueSOC) * 100.0 << " %" << endl;
     cout << "(Negative error means the estimate is below the true SOC.)" << endl;
 }
- 
+
 // T6: energy in/out, efficiency, and cycle count
 void reportEnergy(Simulator& sim)
 {
     EnergyTracker& energy = sim.getEnergyTracker();
- 
+
     cout << fixed << setprecision(3);
     cout << "\n--- Energy report ---" << endl;
     cout << "Energy in:   " << setw(9) << energy.getWhIn() << " Wh" << endl;
     cout << "Energy out:  " << setw(9) << energy.getWhOut() << " Wh" << endl;
- 
+
     // Efficiency only means something once the pack has been charged AND discharged
     cout << setprecision(1);
     if (energy.getWhIn() <= 0.0) {
@@ -92,16 +116,16 @@ void reportEnergy(Simulator& sim)
     } else {
         cout << "Efficiency:  " << setw(9) << energy.getEfficiency() << " %" << endl;
     }
- 
+
     cout << setprecision(2);
     cout << "Cycle count: " << setw(9) << energy.getCycleCount() << " equivalent full cycles" << endl;
 }
- 
+
 // Prints every limit plus the current fault and warning status (used by T7)
 static void printLimits(Protection& prot)
 {
     const char* units[Protection::NUM_CHECKS] = {"V", "V", "A", "C", "%"};
- 
+
     cout << fixed << setprecision(2);
     cout << "\n--- Protection limits ---" << endl;
     cout << left << setw(22) << "Check"
@@ -116,7 +140,7 @@ static void printLimits(Protection& prot)
              << right << setw(7) << fault << " " << units[i] << endl;
     }
     cout << left;
- 
+
     if (prot.isFaulted()) {
         cout << "Status: FAULTED - " << prot.getFaultReason() << endl;
     } else {
@@ -129,29 +153,29 @@ static void printLimits(Protection& prot)
         }
     }
 }
- 
+
 // T7: view and change protection limits, and reset a latched fault
 void setThresholds(Simulator& sim)
 {
     Protection& prot = sim.getProtection();
- 
+
     while (true) {
         printLimits(prot);
         cout << "\n1. Change a limit\n"
              << "2. Reset latched fault\n"
              << "0. Back to main menu\n"
              << "Select an option: ";
- 
+
         int choice;
         if (!readNumber(choice)) {
             if (cin.eof()) return;
             continue;
         }
- 
+
         switch (choice) {
             case 0:
                 return;
- 
+
             case 1: {
                 int which, level;
                 double value;
@@ -167,20 +191,20 @@ void setThresholds(Simulator& sim)
                     cout << "Invalid level." << endl;
                     break;
                 }
- 
+
                 int index = which - 1;
                 bool isSOC = (index == Protection::LOW_SOC);
                 cout << "New value" << (isSOC ? " (percent)" : "") << ": ";
                 if (!readNumber(value)) break;
                 if (isSOC) value /= 100.0;  // stored as a fraction
- 
+
                 Protection::Level lvl = (level == 1) ? Protection::WARNING : Protection::FAULT;
                 if (!prot.setLimit(index, lvl, value)) {
                     cout << "Invalid value; limit not changed." << endl;
                     break;
                 }
                 cout << "Limit updated." << endl;
- 
+
                 // Warn if the warning level is now past the fault level
                 double warn = prot.getLimit(index, Protection::WARNING);
                 double fault = prot.getLimit(index, Protection::FAULT);
@@ -191,7 +215,7 @@ void setThresholds(Simulator& sim)
                 }
                 break;
             }
- 
+
             case 2:
                 if (!prot.isFaulted()) {
                     cout << "No fault to reset." << endl;
@@ -207,7 +231,7 @@ void setThresholds(Simulator& sim)
                     cout << "Fault cleared. Contactor closed." << endl;
                 }
                 break;
- 
+
             default:
                 cout << "Invalid option." << endl;
         }
