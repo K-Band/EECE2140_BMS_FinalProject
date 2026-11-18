@@ -197,9 +197,6 @@ void runScenario(Simulator& sim)
     cout << "\nRunning discharge at 3 A..." << endl;
     sim.runDischarge();
 
-    cout << "\nFinal battery status:" << endl;
-    sim.printStatusLine();
-
     cout << "\nEvent Log:" << endl;
     sim.getEventLog().print();
 
