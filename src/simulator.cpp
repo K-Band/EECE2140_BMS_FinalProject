@@ -45,11 +45,8 @@ void Simulator::runDischarge()
     // Maximum simulation time is 4 hours
     double startTime = time;
     double maxTime = 14400.0;
-    double nextPrint = time + 60.0;
 
     eventLog.add(time, "Discharge cycle started");
-
-    printStatusLine();
 
     while (time - startTime < maxTime)
     {
@@ -79,12 +76,6 @@ void Simulator::runDischarge()
         }
 
         step(current);
-
-        if (time >= nextPrint)
-        {
-            printStatusLine();
-            nextPrint = time + 60.0;
-        }
 
         if (protection.isFaulted())
         {
